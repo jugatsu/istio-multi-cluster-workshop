@@ -1,0 +1,18 @@
+revision: 1-29-0
+revisionTags:
+  - canary
+
+# meshConfig:
+#   discoverySelectors:
+#     - matchLabels:
+#         istio-discovery: enabled
+global:
+  configValidation: true
+  hub: docker.io/istio
+  istioNamespace: istio-system
+  meshID: mesh1
+  multiCluster:
+    clusterName: cluster1
+  network: network1
+  proxy:
+    privileged: true

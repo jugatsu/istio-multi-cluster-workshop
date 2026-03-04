@@ -1,0 +1,122 @@
+version: '3'
+
+vars:
+  K8S_VERSION: "v1.30.10"
+  ISTIO_VERSION: "1.28.4"
+  ISTIO_CANARY_VERSION: "1.29.0"
+  CNI: '{{default "calico" .CNI}}'
+  SKIP_APPS: '{{default "0" .SKIP_APPS}}'
+
+tasks:
+  bootstrap:
+    desc: Bootstrap two kind clusters with Istio multicluster and sample apps
+    cmds:
+      - task: doctor
+      - task: clusters:create
+      - task: certs:create
+      - task: certs:check
+      - task: deps:helm-repo
+      - task: clusters:bootstrap
+      - task: mesh:link
+      - task: apps:deploy
+        vars:
+          SKIP_APPS: '{{.SKIP_APPS}}'
+      - task: verify
+
+  doctor:
+    desc: Check required CLI tools
+    cmds:
+      - >-
+        bash -c 'for c in kind kubectl helm istioctl task make openssl; do command -v "$c" >/dev/null || { echo "missing: $c" >&2; exit 1; }; done'
+
+  certs:check:
+    desc: Check generated cluster CA cert files under certs/
+    cmds:
+      - >-
+        bash -c 'for cluster in cluster1 cluster2; do for f in ca-cert.pem ca-key.pem root-cert.pem cert-chain.pem; do p="certs/${cluster}/${f}"; [ -f "$p" ] || { echo "missing cert file: $p" >&2; exit 1; }; done; done'
+
+  certs:create:
+    desc: Generate self-signed root CA and per-cluster Istio intermediate certs under certs/
+    cmds:
+      - ./scripts/certs/create-cacerts.sh
+
+  certs:clean:
+    desc: Remove generated certs output (root and cluster intermediates)
+    cmds:
+      - rm -rf certs/cluster1 certs/cluster2 certs/root-cert.pem certs/root-key.pem certs/root-cert.srl
+
+  deps:helm-repo:
+    desc: Ensure Istio Helm repo exists
+    cmds:
+      - helm repo add istio https://istio-release.storage.googleapis.com/charts --force-update
+      - helm repo update istio
+
+  clusters:create:
+    desc: Create both kind clusters
+    cmds:
+      - task: k8s:cluster1
+      - task: k8s:cluster2
+
+  clusters:bootstrap:
+    desc: Install CNI, Istio, MetalLB and east-west gateway on both clusters
+    cmds:
+      - CNI={{.CNI}} ISTIO_VERSION={{.ISTIO_VERSION}} ./scripts/bootstrap/bootstrap-cluster.sh cluster1
+      - CNI={{.CNI}} ISTIO_VERSION={{.ISTIO_VERSION}} ./scripts/bootstrap/bootstrap-cluster.sh cluster2
+
+  canary:
+    desc: Install Istio canary control plane via Helm
+    vars:
+      CLUSTER: '{{default "cluster1" .CLUSTER}}'
+      CANARY: '{{default "canary" .CANARY}}'
+    cmds:
+      - >-
+        helm --kube-context kind-{{.CLUSTER}} upgrade --install --wait --version {{.ISTIO_CANARY_VERSION}}
+        istio-base istio/base -n istio-system --create-namespace
+      - >-
+        helm --kube-context kind-{{.CLUSTER}} upgrade --install --wait --version {{.ISTIO_CANARY_VERSION}}
+        istiod-{{.CANARY}} istio/istiod -n istio-system
+        --values helm-values/{{.CLUSTER}}/istiod-{{.CANARY}}/values.yaml
+
+  mesh:link:
+    desc: Link both clusters for Istio multicluster discovery
+    cmds:
+      - ./scripts/bootstrap/link-clusters.sh
+
+  apps:deploy:
+    desc: Deploy sample apps to both clusters
+    cmds:
+      - if [ "{{.SKIP_APPS}}" = "1" ]; then echo "Skipping apps deployment"; exit 0; fi
+      - ./scripts/bootstrap/deploy-apps.sh
+
+  verify:
+    desc: Basic post-bootstrap checks
+    cmds:
+      - kubectl --context kind-cluster1 get pods -A
+      - kubectl --context kind-cluster2 get pods -A
+      - istioctl remote-clusters --context=kind-cluster1
+      - istioctl remote-clusters --context=kind-cluster2
+
+  k8s:cluster1:
+    desc: Create kind cluster1
+    dir: '{{.USER_WORKING_DIR}}'
+    cmds:
+      - kind create cluster --config=kind/cluster1.yaml --name cluster1 --image=kindest/node:{{ .K8S_VERSION }}
+
+  k8s:cluster2:
+    desc: Create kind cluster2
+    dir: '{{.USER_WORKING_DIR}}'
+    cmds:
+      - kind create cluster --config=kind/cluster2.yaml --name cluster2 --image=kindest/node:{{ .K8S_VERSION }}
+
+  down:
+    desc: Delete both kind clusters
+    dir: '{{.USER_WORKING_DIR}}'
+    cmds:
+      - kind delete cluster --name cluster1
+      - kind delete cluster --name cluster2
+
+  reset:
+    desc: Tear down clusters and remove generated certs
+    cmds:
+      - task: down
+      - task: certs:clean

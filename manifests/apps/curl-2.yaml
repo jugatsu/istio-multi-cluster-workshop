@@ -1,0 +1,52 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: curl-2
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: curl-2
+  labels:
+    app: curl-2
+    service: curl-2
+spec:
+  ports:
+  - port: 80
+    name: http
+  selector:
+    app: curl-2
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: curl-2
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: curl-2
+  template:
+    metadata:
+      annotations:
+        proxy.istio.io/config: |
+          proxyMetadata:
+            ISTIO_META_DNS_CAPTURE: "true"
+      labels:
+        app: curl-2
+    spec:
+      terminationGracePeriodSeconds: 0
+      serviceAccountName: curl-2
+      containers:
+      - name: curl-2
+        image: curlimages/curl
+        command: ["/bin/sleep", "infinity"]
+        imagePullPolicy: IfNotPresent
+        volumeMounts:
+        - mountPath: /etc/curl-2/tls
+          name: secret-volume
+      volumes:
+      - name: secret-volume
+        secret:
+          secretName: curl-2-secret
+          optional: true

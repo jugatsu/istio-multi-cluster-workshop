@@ -1,0 +1,19 @@
+# OS / editor noise
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# Generated certificates and keys (keep scripts/certs Makefiles tracked)
+certs/cluster1/
+certs/cluster2/
+certs/root-cert.pem
+certs/root-key.pem
+certs/root-cert.srl
+certs/*.csr
+certs/*.conf
+certs/*.srl
+*.pem
+*.key
+*.crt

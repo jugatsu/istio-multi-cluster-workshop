@@ -1,0 +1,3 @@
+[tools]
+istioctl = "1.28.4"
+cilium-cli = "0.18.9"

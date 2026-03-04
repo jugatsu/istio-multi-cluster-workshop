@@ -1,0 +1,21 @@
+# https://docs.cilium.io/en/latest/network/servicemesh/istio/
+kubeProxyReplacement: true
+socketLB:
+  hostNamespaceOnly: true
+cni:
+  exclusive: false
+
+ipv4:
+  enabled: true
+ipv6:
+  enabled: false
+
+hubble:
+  enabled: true
+  relay:
+    enabled: true
+  ui:
+    enabled: true
+
+envoy:
+  enabled: false
