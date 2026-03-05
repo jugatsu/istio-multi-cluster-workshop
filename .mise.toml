@@ -1,3 +1,7 @@
 [tools]
-istioctl = "1.28.4"
 cilium-cli = "0.18.9"
+helm = "3.20.0"
+istioctl = "1.28.4"
+kind = "0.31.0"
+kubectl = "1.30.10"
+task = "3.48.0"

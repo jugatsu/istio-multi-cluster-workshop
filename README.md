@@ -11,6 +11,12 @@ Local lab to bootstrap a two-cluster Istio multicluster environment on Kind, inc
 
 Install these CLIs before running bootstrap:
 
+Using [mise](https://mise.jdx.dev/) is recommended to install the required toolchain before bootstrap:
+
+```bash
+mise install
+```
+
 - `kind`
 - `kubectl`
 - `helm`
